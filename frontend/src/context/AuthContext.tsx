@@ -53,21 +53,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const login = async (username: string, password: string) => {
-    try {
-      const res = await axios.post('http://localhost:5000/api/auth/login', {
-        username,
-        password
-      });
-      
-      const { token: newToken, user: newUser } = res.data;
-      setToken(newToken);
-      setUser(newUser);
-      localStorage.setItem('token', newToken);
-    } catch (err: any) {
-      console.error('Login failed:', err);
-      throw new Error(err.response?.data?.error || 'Login failed');
-    }
-  };
+  try {
+    console.log('Attempting login with:', { username, password }); // DEBUG
+    
+    const res = await axios.post('http://localhost:5000/api/auth/login', {
+      username,
+      password
+    });
+    
+    console.log('Login response:', res.data); // DEBUG
+    
+    const { token: newToken, user: newUser } = res.data;
+    setToken(newToken);
+    setUser(newUser);
+    localStorage.setItem('token', newToken);
+  } catch (err: any) {
+    console.error('Login failed - full error:', err); // DEBUG
+    console.error('Response data:', err.response?.data); // DEBUG
+    throw new Error(err.response?.data?.error || 'Login failed');
+  }
+};
 
   const logout = () => {
     setUser(null);

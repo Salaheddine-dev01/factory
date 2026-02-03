@@ -46,15 +46,26 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
     let query = "SELECT * FROM interventions";
     let params: any[] = [];
 
-    // Workers only see their own interventions
+    console.log('GET request from user:', req.user?.username, 'role:', req.user?.role);
+
     if (req.user?.role === "worker") {
       query += " WHERE mecanicien = ?";
       params.push(req.user.username);
+      console.log('Filtering by mecanicien:', req.user.username);
     }
 
     query += " ORDER BY id DESC";
 
-    const [rows] = await pool.query(query, params);
+    const [rows]: any = await pool.query(query, params);
+    
+    console.log('Query:', query);
+    console.log('Params:', params);
+    console.log('Rows returned:', rows.length);
+    
+    if (rows.length > 0) {
+      console.log('First row mecanicien:', rows[0].mecanicien);
+    }
+
     res.json(rows);
   } catch (err: any) {
     console.error("DB ERROR [GET /interventions]:", err);
@@ -91,7 +102,14 @@ router.post("/", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const body = req.body;
     
-    console.log('Received POST data:', body);
+    console.log('POST request from user:', req.user?.username, 'role:', req.user?.role);
+    console.log('Received data:', body);
+
+    // FOR WORKERS: Auto-set mecanicien to their username
+    if (req.user?.role === "worker") {
+      body.mecanicien = req.user.username;
+      console.log('Auto-set mecanicien to:', req.user.username);
+    }
 
     const values = allFields.map((key) => {
       const value = body[key];
@@ -111,6 +129,8 @@ router.post("/", authenticate, async (req: AuthRequest, res: Response) => {
       return safeString(value);
     });
 
+    console.log('Values to insert:', values);
+
     const sql = `
       INSERT INTO interventions
       (${allFields.join(", ")})
@@ -118,6 +138,8 @@ router.post("/", authenticate, async (req: AuthRequest, res: Response) => {
     `;
 
     const [result]: any = await pool.query(sql, values);
+
+    console.log('Insert successful, ID:', result.insertId);
 
     res.status(201).json({ 
       message: "Intervention added successfully",

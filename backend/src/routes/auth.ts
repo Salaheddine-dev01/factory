@@ -2,6 +2,7 @@
 import express, { Request, Response } from "express";
 import pool from "../db";
 import jwt from "jsonwebtoken";
+import bcrypt from "bcrypt";
 
 const router = express.Router();
 
@@ -12,23 +13,45 @@ router.post("/login", async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
 
+    console.log('Login attempt:', { username }); // Don't log passwords!
+
     if (!username || !password) {
+      console.log('Missing credentials');
       return res.status(400).json({ error: "Username and password required" });
     }
 
+    // Find user
     const [users]: any = await pool.query(
       "SELECT * FROM users WHERE username = ?",
       [username]
     );
 
+    console.log('Users found:', users.length);
+
     if (users.length === 0) {
+      console.log('No user found with username:', username);
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
     const user = users[0];
 
-    // Plain text password check (we'll hash later)
-    if (user.password !== password) {
+    // Check if password is bcrypt hash or plain text
+    let isValidPassword = false;
+    
+    if (user.password.startsWith('$2b$') || user.password.startsWith('$2a$')) {
+      // Bcrypt hash - use bcrypt.compare
+      isValidPassword = await bcrypt.compare(password, user.password);
+      console.log('Using bcrypt comparison');
+    } else {
+      // Plain text - direct comparison
+      isValidPassword = user.password === password;
+      console.log('Using plain text comparison');
+    }
+
+    console.log('Password valid:', isValidPassword);
+
+    if (!isValidPassword) {
+      console.log('Password mismatch');
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
@@ -43,6 +66,8 @@ router.post("/login", async (req: Request, res: Response) => {
       JWT_SECRET,
       { expiresIn: "24h" }
     );
+
+    console.log('Login successful for user:', username);
 
     res.json({
       message: "Login successful",
